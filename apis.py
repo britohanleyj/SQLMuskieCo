@@ -1,20 +1,18 @@
-import sqlite3
-
+import mysql.connector
 
 # ------ Start of information processing ------
 
 # ------ Store info ------
 
-# store id is auto-incrementing
 def enter_store(cursor):
     store_addr = input("Enter store address: ").strip()
     phone = input("Enter store phone #: ").strip()
 
     try:
-        cursor.execute("INSERT INTO StoreAddress (StoreAddr, Phone) VALUES (?, ?)", (store_addr, phone))
-        cursor.execute("INSERT INTO Store (StoreAddr) VALUES (?)", (store_addr,))
+        cursor.execute("INSERT INTO StoreAddress (StoreAddr, Phone) VALUES (%s, %s)", (store_addr, phone))
+        cursor.execute("INSERT INTO Store (StoreAddr) VALUES (%s)", (store_addr,))
         print("Store added successfully.")
-    except sqlite3.Error as e:
+    except mysql.connector.Error as e:
         print(f"Error: {e}")
 
 
@@ -22,13 +20,14 @@ def search_store(cursor):
     store_id = input("Enter Store ID (or press Enter to skip): ").strip()
     store_addr = input("Enter Store Address (or press Enter to skip): ").strip()
 
-    query = "SELECT Store.StoreID, Store.StoreAddr, StoreAddress.Phone FROM Store JOIN StoreAddress ON Store.StoreAddr = StoreAddress.StoreAddr WHERE 1=1"
+    query = """SELECT Store.StoreID, Store.StoreAddr, StoreAddress.Phone 
+               FROM Store JOIN StoreAddress ON Store.StoreAddr = StoreAddress.StoreAddr WHERE 1=1"""
     params = []
     if store_id:
-        query += " AND Store.StoreID = ?"
+        query += " AND Store.StoreID = %s"
         params.append(store_id)
     if store_addr:
-        query += " AND Store.StoreAddr = ?"
+        query += " AND Store.StoreAddr = %s"
         params.append(store_addr)
 
     cursor.execute(query, tuple(params))
@@ -43,8 +42,7 @@ def search_store(cursor):
 def update_store(cursor):
     store_id = input("Enter the Store ID to update: ").strip()
 
-    # get current store info
-    cursor.execute("SELECT StoreAddr FROM Store WHERE StoreID = ?", (store_id,))
+    cursor.execute("SELECT StoreAddr FROM Store WHERE StoreID = %s", (store_id,))
     result = cursor.fetchone()
 
     if not result:
@@ -62,40 +60,32 @@ def update_store(cursor):
         phone_changed = bool(new_phone)
 
         if address_changed:
-            # prevent address conflict
-            cursor.execute("SELECT 1 FROM StoreAddress WHERE StoreAddr = ?", (new_addr,))
+            cursor.execute("SELECT 1 FROM StoreAddress WHERE StoreAddr = %s", (new_addr,))
             if cursor.fetchone():
                 print("That address already exists. Please update the phone separately if needed.")
                 return
 
-            # copy current phone if new phone not provided
             if not phone_changed:
-                cursor.execute("SELECT Phone FROM StoreAddress WHERE StoreAddr = ?", (current_addr,))
+                cursor.execute("SELECT Phone FROM StoreAddress WHERE StoreAddr = %s", (current_addr,))
                 phone_row = cursor.fetchone()
                 new_phone = phone_row[0] if phone_row else "000-000-0000"
 
-            # insert the new address
-            cursor.execute("INSERT INTO StoreAddress (StoreAddr, Phone) VALUES (?, ?)", (new_addr, new_phone))
-
-            # update Store to use new address
-            cursor.execute("UPDATE Store SET StoreAddr = ? WHERE StoreID = ?", (new_addr, store_id))
+            cursor.execute("INSERT INTO StoreAddress (StoreAddr, Phone) VALUES (%s, %s)", (new_addr, new_phone))
+            cursor.execute("UPDATE Store SET StoreAddr = %s WHERE StoreID = %s", (new_addr, store_id))
             print("Store address updated.")
 
-            # delete old address if no other stores use it
-            cursor.execute("SELECT COUNT(*) FROM Store WHERE StoreAddr = ?", (current_addr,))
+            cursor.execute("SELECT COUNT(*) FROM Store WHERE StoreAddr = %s", (current_addr,))
             if cursor.fetchone()[0] == 0:
-                cursor.execute("DELETE FROM StoreAddress WHERE StoreAddr = ?", (current_addr,))
+                cursor.execute("DELETE FROM StoreAddress WHERE StoreAddr = %s", (current_addr,))
                 print("Old address deleted (no longer used).")
 
         elif phone_changed:
-            # update phone for the current address
-            cursor.execute("UPDATE StoreAddress SET Phone = ? WHERE StoreAddr = ?", (new_phone, current_addr))
+            cursor.execute("UPDATE StoreAddress SET Phone = %s WHERE StoreAddr = %s", (new_phone, current_addr))
             print("Phone number updated.")
-
         else:
             print("No changes made.")
 
-    except sqlite3.Error as e:
+    except mysql.connector.Error as e:
         print(f"Update failed: {e}")
 
 
@@ -103,8 +93,7 @@ def delete_store(cursor):
     store_id = input("Enter Store ID to delete: ").strip()
 
     try:
-        # get the store address from the Store ID
-        cursor.execute("SELECT StoreAddr FROM Store WHERE StoreID = ?", (store_id,))
+        cursor.execute("SELECT StoreAddr FROM Store WHERE StoreID = %s", (store_id,))
         result = cursor.fetchone()
 
         if not result:
@@ -113,57 +102,48 @@ def delete_store(cursor):
 
         store_addr = result[0]
 
-        # delete from Store table
-        cursor.execute("DELETE FROM Store WHERE StoreID = ?", (store_id,))
-
-        # then delete from StoreAddress
-        cursor.execute("DELETE FROM StoreAddress WHERE StoreAddr = ?", (store_addr,))
-
+        cursor.execute("DELETE FROM Store WHERE StoreID = %s", (store_id,))
+        cursor.execute("DELETE FROM StoreAddress WHERE StoreAddr = %s", (store_addr,))
         print("Store and its address deleted successfully.")
-    except sqlite3.Error as e:
+    except mysql.connector.Error as e:
         print(f"Error deleting store: {e}")
 
 
 # ------ Member info ------
 
-
 def enter_member(cursor):
     customer_id = int(input("CustomerID: "))
     email = input("Email: ")
-    # phone = input("Phone #: ") - don't have a phone column in that table
     home_addr = input("Home Address: ")
     active = input("Active? (yes/no): ").lower() == "yes"
     reward_points = int(input("Rewards Points: "))
     staff_id = int(input("Staff ID sending notice: "))
 
     try:
-        cursor.execute("INSERT INTO CustomerEmail (Email, CustomerName, HomeAddr, ActivateStatus, StaffIDSendsNotice, RewardPoints) VALUES (?, ?, ?, ?, ?, ?)",
+        cursor.execute("INSERT INTO CustomerEmail (Email, CustomerName, HomeAddr, ActivateStatus, StaffIDSendsNotice, RewardPoints) VALUES (%s, %s, %s, %s, %s, %s)",
                        (email, email.split("@")[0], home_addr, active, staff_id, reward_points))
-        cursor.execute("INSERT INTO MemberInfo (CustomerID, Email) VALUES (?, ?)", (customer_id, email))
+        cursor.execute("INSERT INTO MemberInfo (CustomerID, Email) VALUES (%s, %s)", (customer_id, email))
         print("Member entered successfully.")
-    except sqlite3.Error as e:
+    except mysql.connector.Error as e:
         print("Error entering member:", e)
 
 
 def search_member(cursor):
-    query = "SELECT CustomerID, Email, HomeAddr, ActivateStatus, StaffIDSendsNotice, RewardPoints FROM CustomerEmail JOIN MemberInfo USING(Email)"
+    query = """SELECT CustomerID, Email, HomeAddr, ActivateStatus, StaffIDSendsNotice, RewardPoints 
+               FROM CustomerEmail JOIN MemberInfo USING(Email)"""
     param = input("Enter CustomerID or Email: ").strip()
     if param.isdigit():
-        cursor.execute(query + " WHERE CustomerID = ?", (int(param),))
+        cursor.execute(query + " WHERE CustomerID = %s", (int(param),))
     else:
-        cursor.execute(query + " WHERE Email = ?", (param,))
+        cursor.execute(query + " WHERE Email = %s", (param,))
     result = cursor.fetchone()
-    if result:
-        print("Member Info:", result)
-    else:
-        print("No member found.")
+    print("Member Info:", result if result else "No member found.")
 
 
 def update_member(cursor):
     customer_id = int(input("CustomerID to update: "))
 
-    # Look up email from MemberInfo
-    cursor.execute("SELECT Email FROM MemberInfo WHERE CustomerID = ?", (customer_id,))
+    cursor.execute("SELECT Email FROM MemberInfo WHERE CustomerID = %s", (customer_id,))
     result = cursor.fetchone()
 
     if not result:
@@ -177,13 +157,11 @@ def update_member(cursor):
     staff_id = int(input("New Staff ID sending notice: "))
 
     try:
-        cursor.execute("""
-            UPDATE CustomerEmail 
-            SET HomeAddr = ?, ActivateStatus = ?, StaffIDSendsNotice = ?, RewardPoints = ?
-            WHERE Email = ?""", (home_addr, active, staff_id, reward_points, email)
-            )
+        cursor.execute("""UPDATE CustomerEmail 
+                          SET HomeAddr = %s, ActivateStatus = %s, StaffIDSendsNotice = %s, RewardPoints = %s
+                          WHERE Email = %s""", (home_addr, active, staff_id, reward_points, email))
         print("Member updated.")
-    except sqlite3.Error as e:
+    except mysql.connector.Error as e:
         print(f"Update failed: {e}")
 
 
@@ -191,17 +169,16 @@ def delete_member(cursor):
     param = input("Enter CustomerID or Email to delete: ").strip()
     try:
         if param.isdigit():
-            cursor.execute("DELETE FROM MemberInfo WHERE CustomerID = ?", (int(param),))
+            cursor.execute("DELETE FROM MemberInfo WHERE CustomerID = %s", (int(param),))
         else:
-            cursor.execute("DELETE FROM MemberInfo WHERE Email = ?", (param,))
-            cursor.execute("DELETE FROM CustomerEmail WHERE Email = ?", (param,))
+            cursor.execute("DELETE FROM MemberInfo WHERE Email = %s", (param,))
+            cursor.execute("DELETE FROM CustomerEmail WHERE Email = %s", (param,))
         print("Member deleted.")
-    except sqlite3.Error as e:
+    except mysql.connector.Error as e:
         print("Delete failed:", e)
 
 
 # ------ Staff info ------
-
 
 def enter_staff(cursor):
     staff_id = int(input("Staff ID Has Store: "))
@@ -216,11 +193,11 @@ def enter_staff(cursor):
     try:
         cursor.execute("""INSERT INTO StaffEmails (StaffIDHasStore, StaffName, Age, HomeAddr, 
                           JobTitle, Email, TimeOfEmployment, NumberOfSignUps) 
-                          VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
                        (staff_id, name, age, addr, job, email, date, signups))
-        cursor.execute("INSERT INTO StaffInfo (StaffID, Email) VALUES (?, ?)", (staff_id, email))
+        cursor.execute("INSERT INTO StaffInfo (StaffID, Email) VALUES (%s, %s)", (staff_id, email))
         print("Staff entered.")
-    except sqlite3.Error as e:
+    except mysql.connector.Error as e:
         print("Insert failed:", e)
 
 
@@ -231,9 +208,9 @@ def search_staff(cursor):
                FROM StaffEmails JOIN StaffInfo USING(Email)"""
 
     if param.isdigit():
-        cursor.execute(query + " WHERE StaffID = ?", (int(param),))
+        cursor.execute(query + " WHERE StaffID = %s", (int(param),))
     else:
-        cursor.execute(query + " WHERE Email = ?", (param,))
+        cursor.execute(query + " WHERE Email = %s", (param,))
     result = cursor.fetchone()
     print("Staff info:", result if result else "No match.")
 
@@ -249,11 +226,13 @@ def update_staff(cursor):
     signups = int(input("New # of Sign-Ups: "))
 
     try:
-        cursor.execute("""UPDATE StaffEmails SET StaffIDHasStore=?, StaffName=?, Age=?, HomeAddr=?, 
-                          JobTitle=?, TimeOfEmployment=?, NumberOfSignUps=? WHERE Email=?""",
+        cursor.execute("""UPDATE StaffEmails 
+                          SET StaffIDHasStore=%s, StaffName=%s, Age=%s, HomeAddr=%s, 
+                          JobTitle=%s, TimeOfEmployment=%s, NumberOfSignUps=%s 
+                          WHERE Email=%s""",
                        (staff_id, name, age, addr, job, date, signups, email))
         print("Staff updated.")
-    except sqlite3.Error as e:
+    except mysql.connector.Error as e:
         print("Update failed:", e)
 
 
@@ -261,17 +240,16 @@ def delete_staff(cursor):
     param = input("Enter StaffID or Email to delete: ").strip()
     try:
         if param.isdigit():
-            cursor.execute("DELETE FROM StaffInfo WHERE StaffID = ?", (int(param),))
+            cursor.execute("DELETE FROM StaffInfo WHERE StaffID = %s", (int(param),))
         else:
-            cursor.execute("DELETE FROM StaffInfo WHERE Email = ?", (param,))
-            cursor.execute("DELETE FROM StaffEmails WHERE Email = ?", (param,))
+            cursor.execute("DELETE FROM StaffInfo WHERE Email = %s", (param,))
+            cursor.execute("DELETE FROM StaffEmails WHERE Email = %s", (param,))
         print("Staff deleted.")
-    except sqlite3.Error as e:
+    except mysql.connector.Error as e:
         print("Delete failed:", e)
 
 
 # ------ Discount info ------
-
 
 def enter_discount(cursor):
     product_id = int(input("ProductID: "))
@@ -279,16 +257,16 @@ def enter_discount(cursor):
     valid_date = input("Valid Until (YYYY-MM-DD): ")
 
     try:
-        cursor.execute("INSERT INTO DiscountInfo (DiscountDesc, ValidDate, ProductID) VALUES (?, ?, ?)",
+        cursor.execute("INSERT INTO DiscountInfo (DiscountDesc, ValidDate, ProductID) VALUES (%s, %s, %s)",
                        (desc, valid_date, product_id))
         print("Discount added.")
-    except sqlite3.Error as e:
+    except mysql.connector.Error as e:
         print("Insert failed:", e)
 
 
 def search_discount(cursor):
     product_id = int(input("Enter Product ID: "))
-    cursor.execute("SELECT * FROM DiscountInfo WHERE ProductID = ?", (product_id,))
+    cursor.execute("SELECT * FROM DiscountInfo WHERE ProductID = %s", (product_id,))
     result = cursor.fetchone()
     print("Discount Info:", result if result else "No discount found.")
 
@@ -299,43 +277,40 @@ def update_discount(cursor):
     valid_date = input("New Valid Date (YYYY-MM-DD): ")
 
     try:
-        cursor.execute("UPDATE DiscountInfo SET DiscountDesc = ?, ValidDate = ? WHERE ProductID = ?",
+        cursor.execute("UPDATE DiscountInfo SET DiscountDesc = %s, ValidDate = %s WHERE ProductID = %s",
                        (desc, valid_date, product_id))
         print("Discount updated.")
-    except sqlite3.Error as e:
+    except mysql.connector.Error as e:
         print("Update failed:", e)
 
 
 def delete_discount(cursor):
     product_id = int(input("Enter Product ID to delete discount for: "))
     try:
-        cursor.execute("DELETE FROM DiscountInfo WHERE ProductID = ?", (product_id,))
+        cursor.execute("DELETE FROM DiscountInfo WHERE ProductID = %s", (product_id,))
         print("Discount deleted.")
-    except sqlite3.Error as e:
+    except mysql.connector.Error as e:
         print("Delete failed:", e)
 
 
-# ------ End of information processing ------
-
-
-# ------ Start of maintaining inventory records ------
-
+# ------ Inventory Records ------
 
 def update_inventory(cursor):
     product_id = int(input("Enter Product ID: "))
     store_id = int(input("Enter Store ID: "))
     quantity = int(input("Enter quantity to add or return: "))
 
-    # Try to update first
-    cursor.execute("SELECT InstockQuantity FROM ProductQuantity WHERE ProductID = ? AND StoreID = ?", (product_id, store_id))
+    cursor.execute("SELECT InstockQuantity FROM ProductQuantity WHERE ProductID = %s AND StoreID = %s",
+                   (product_id, store_id))
     result = cursor.fetchone()
     if result:
         new_qty = result[0] + quantity
-        cursor.execute("UPDATE ProductQuantity SET InstockQuantity = ? WHERE ProductID = ? AND StoreID = ?", (new_qty, product_id, store_id))
+        cursor.execute("UPDATE ProductQuantity SET InstockQuantity = %s WHERE ProductID = %s AND StoreID = %s",
+                       (new_qty, product_id, store_id))
         print("Inventory updated.")
     else:
-        cursor.execute("INSERT INTO ProductQuantity (ProductID, StoreID, InstockQuantity) VALUES (?, ?, ?)", (product_id, store_id, quantity))
+        cursor.execute("INSERT INTO ProductQuantity (ProductID, StoreID, InstockQuantity) VALUES (%s, %s, %s)",
+                       (product_id, store_id, quantity))
         print("New inventory record added.")
 
-
-# ------ End of maintaining inventory records ------
+        
