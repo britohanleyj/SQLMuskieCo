@@ -12,8 +12,21 @@ def enter_store(cursor):
         cursor.execute("INSERT INTO StoreAddress (StoreAddr, Phone) VALUES (%s, %s)", (store_addr, phone))
         cursor.execute("INSERT INTO Store (StoreAddr) VALUES (%s)", (store_addr,))
         print("Store added successfully.")
+
+        # Show newly inserted store
+        cursor.execute("""
+            SELECT Store.StoreID, Store.StoreAddr, StoreAddress.Phone
+            FROM Store
+            JOIN StoreAddress ON Store.StoreAddr = StoreAddress.StoreAddr
+            WHERE Store.StoreAddr = %s
+            ORDER BY StoreID DESC LIMIT 1
+        """, (store_addr,))
+        result = cursor.fetchone()
+        print("New Store Record:", result)
+
     except mysql.connector.Error as e:
         print(f"Error: {e}")
+
 
 
 def search_store(cursor):
@@ -84,9 +97,21 @@ def update_store(cursor):
             print("Phone number updated.")
         else:
             print("No changes made.")
+            return
+
+        # ✅ Show the updated row
+        cursor.execute("""
+            SELECT Store.StoreID, Store.StoreAddr, StoreAddress.Phone
+            FROM Store
+            JOIN StoreAddress ON Store.StoreAddr = StoreAddress.StoreAddr
+            WHERE Store.StoreID = %s
+        """, (store_id,))
+        updated = cursor.fetchone()
+        print("Updated Store Record:", updated)
 
     except mysql.connector.Error as e:
         print(f"Update failed: {e}")
+
 
 
 def delete_store(cursor):
@@ -124,8 +149,18 @@ def enter_member(cursor):
                        (email, email.split("@")[0], home_addr, active, staff_id, reward_points))
         cursor.execute("INSERT INTO MemberInfo (CustomerID, Email) VALUES (%s, %s)", (customer_id, email))
         print("Member entered successfully.")
+
+        # Show the new member record
+        cursor.execute("""
+            SELECT CustomerID, Email, HomeAddr, ActivateStatus, StaffIDSendsNotice, RewardPoints
+            FROM CustomerEmail JOIN MemberInfo USING(Email)
+            WHERE CustomerID = %s
+        """, (customer_id,))
+        print("New Member Record:", cursor.fetchone())
+
     except mysql.connector.Error as e:
         print("Error entering member:", e)
+
 
 
 def search_member(cursor):
@@ -160,7 +195,11 @@ def update_member(cursor):
         cursor.execute("""UPDATE CustomerEmail 
                           SET HomeAddr = %s, ActivateStatus = %s, StaffIDSendsNotice = %s, RewardPoints = %s
                           WHERE Email = %s""", (home_addr, active, staff_id, reward_points, email))
-        print("Member updated.")
+        cursor.execute("""SELECT CustomerID, Email, HomeAddr, ActivateStatus, StaffIDSendsNotice, RewardPoints
+                          FROM CustomerEmail JOIN MemberInfo USING(Email)
+                          WHERE Email = %s""", (email,))
+        print("Updated Member Record:", cursor.fetchone())
+
     except mysql.connector.Error as e:
         print(f"Update failed: {e}")
 
@@ -313,4 +352,3 @@ def update_inventory(cursor):
                        (product_id, store_id, quantity))
         print("New inventory record added.")
 
-        
