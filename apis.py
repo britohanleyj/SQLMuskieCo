@@ -130,7 +130,7 @@ def delete_store(cursor):
 def enter_member(cursor):
     customer_id = int(input("CustomerID: "))
     email = input("Email: ")
-    phone = input("Phone #: ")
+    # phone = input("Phone #: ") - don't have a phone column in that table
     home_addr = input("Home Address: ")
     active = input("Active? (yes/no): ").lower() == "yes"
     reward_points = int(input("Rewards Points: "))
@@ -157,7 +157,6 @@ def search_member(cursor):
         print("Member Info:", result)
     else:
         print("No member found.")
-
 
 
 def update_member(cursor):
