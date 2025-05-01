@@ -533,3 +533,52 @@ def update_inventory(cursor):
                        (product_id, store_id, quantity))
         print("New inventory record added.")
 
+
+# ------ Reports Info ------
+
+def generate_report(cursor):
+    '''
+    Generates a simple store-product-customer transaction report
+    
+    Parameters:
+        cursor - Active MySQL cursor
+        
+    Returns:
+        None
+    '''
+    
+    print("\nGenerating report...")
+
+    try:
+        cursor.execute("""
+            SELECT 
+                pq.StoreID,
+                pq.InStockQuantity,
+                pq.ProductID,
+                t.PurchaseDate,
+                t.CustomerID AS CustomerIDDoesTransaction,
+                t.TotalPrice,
+                s.StoreAddr,
+                p.ProductName,
+                c.CustomerID,
+                c.CustomerName
+            FROM 
+                ProductQuantity pq
+            JOIN Transactions t ON pq.ProductID = t.ProductID AND pq.StoreID = t.StoreID
+            JOIN Store s ON pq.StoreID = s.StoreID
+            JOIN Product p ON pq.ProductID = p.ProductID
+            JOIN Customer c ON t.CustomerID = c.CustomerID
+            ORDER BY t.PurchaseDate DESC
+        """)
+
+        results = cursor.fetchall()
+        if not results:
+            print("No report data found.")
+            return
+
+        for row in results:
+            print(f"StoreID: {row[0]}, InStock: {row[1]}, ProductID: {row[2]}, Date: {row[3]}, "
+                  f"TxnCustomerID: {row[4]}, Price: ${row[5]:.2f}, StoreAddr: {row[6]}, "
+                  f"Product: {row[7]}, CustomerID: {row[8]}, Name: {row[9]}")
+    except mysql.connector.Error as e:
+        print("Error generating report:", e)

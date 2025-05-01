@@ -17,7 +17,7 @@ from apis import (
     enter_member, search_member, update_member, delete_member,
     enter_staff, search_staff, update_staff, delete_staff,
     enter_discount, search_discount, update_discount, delete_discount,
-    update_inventory
+    update_inventory, generate_report
 )
 
 def generate_rewards_notice(cursor):
@@ -145,7 +145,8 @@ def command_line_ui(cursor):
                 print("Invalid choice.")
 
         elif task_choice == "4":
-            print("Reports feature not implemented yet.")
+            from apis import generate_report
+            generate_report(cursor)
 
         elif task_choice == "5":
             print("Exiting the system. Goodbye!")
