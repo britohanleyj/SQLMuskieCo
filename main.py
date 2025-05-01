@@ -1,3 +1,14 @@
+'''
+Authors: Carter Lange, Julian-Brito Hanley, Lance Silliman, Evan Gunnulfusen
+
+The purpose of this file is to provide a command line interface (CLI) to interact with the MuskieCo database system
+
+This file:
+    1. Connects to a MySQL database using user credentials
+    2. Delegates database operations
+    3. Supports inventory updates and basic reporting features
+'''
+
 import mysql.connector
 import getpass
 
@@ -6,10 +17,20 @@ from apis import (
     enter_member, search_member, update_member, delete_member,
     enter_staff, search_staff, update_staff, delete_staff,
     enter_discount, search_discount, update_discount, delete_discount,
-    update_inventory
+    update_inventory, generate_report
 )
 
 def generate_rewards_notice(cursor):
+    '''
+    This function generates a reward notice for a specific member based on month and year
+    
+    Parameters:
+        cursor - A cursor object that is used to execute MySQL queries
+        
+    Returns:
+        None
+    '''
+    
     print("\nGenerating a rewards notice for a member...")
     member_id = int(input("Member ID number: "))
     month = int(input("Month: "))
@@ -31,6 +52,17 @@ def generate_rewards_notice(cursor):
 
 
 def command_line_ui(cursor):
+    
+    '''
+    This function displays the command-line interface for MuskieCo system and handles user interaction
+    
+    Parameters:
+        cursor - A cursor object that is used to execute MySQL queries
+    
+    Returns:
+        None
+    '''
+    
     print("Welcome to MuskieCo.\n")
 
     while True:
@@ -52,6 +84,19 @@ def command_line_ui(cursor):
             info_choice = input("Choose a category: ").strip()
 
             def handle_ops(enter, search, update, delete):
+                '''
+                This handles operations for a given entity type
+                
+                Parameters:
+                    enter(function): Function to enter a new record
+                    search(function): Function to search for a record
+                    update(function): Function to update a record
+                    delete(function): Function to delete a record
+                    
+                Returns:
+                    None
+                '''
+                
                 print("\nChoose an operation:")
                 print("1. Enter")
                 print("2. Search")
@@ -100,7 +145,7 @@ def command_line_ui(cursor):
                 print("Invalid choice.")
 
         elif task_choice == "4":
-            print("Reports feature not implemented yet.")
+            generate_report(cursor)
 
         elif task_choice == "5":
             print("Exiting the system. Goodbye!")
@@ -111,6 +156,15 @@ def command_line_ui(cursor):
 
 
 def main():
+    '''
+    Main function of the MuskieCo CLI system
+    
+    Prompts for MySQL login credentials, establishes a connection, and launches the command-line UI
+    
+    Returns:
+        None
+    '''
+    
     print("MySQL Database Login\n")
     user = input("Enter MySQL username: ")
     password = getpass.getpass("Enter MySQL password: ")
