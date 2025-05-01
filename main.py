@@ -145,7 +145,6 @@ def command_line_ui(cursor):
                 print("Invalid choice.")
 
         elif task_choice == "4":
-            from apis import generate_report
             generate_report(cursor)
 
         elif task_choice == "5":
