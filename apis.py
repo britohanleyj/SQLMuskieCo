@@ -533,52 +533,212 @@ def update_inventory(cursor):
                        (product_id, store_id, quantity))
         print("New inventory record added.")
 
-
-# ------ Reports Info ------
-
-def generate_report(cursor):
+# ------ Maintaining Transactions ------
+def maintain_transactions(cursor):
     '''
-    Generates a simple store-product-customer transaction report
+    Maintains billing and transaction records including:
+    - Customer rewards
+    - Staff sign-up bonuses
+    - Product transaction prices (with/without discounts)
     
-    Parameters:
-        cursor - Active MySQL cursor
-        
     Returns:
         None
     '''
-    
-    print("\nGenerating report...")
+    print("\n--- Billing and Transaction Records ---")
+    print("1. View customer reward points")
+    print("2. Reset customer reward points")
+    print("3. View staff signup rewards")
+    print("4. Reset staff signups")
+    print("5. View product transaction prices")
+    print("6. View final prices with discounts")
+
+    choice = input("Choose an option (1–6): ").strip()
 
     try:
-        cursor.execute("""
-            SELECT 
-                pq.StoreID,
-                pq.InStockQuantity,
-                pq.ProductID,
-                t.PurchaseDate,
-                t.CustomerID AS CustomerIDDoesTransaction,
-                t.TotalPrice,
-                s.StoreAddr,
-                p.ProductName,
-                c.CustomerID,
-                c.CustomerName
-            FROM 
-                ProductQuantity pq
-            JOIN Transactions t ON pq.ProductID = t.ProductID AND pq.StoreID = t.StoreID
-            JOIN Store s ON pq.StoreID = s.StoreID
-            JOIN Product p ON pq.ProductID = p.ProductID
-            JOIN Customer c ON t.CustomerID = c.CustomerID
-            ORDER BY t.PurchaseDate DESC
-        """)
+        if choice == "1":
+            cursor.execute("""
+                SELECT CE.CustomerName, CE.Email, CE.RewardPoints
+                FROM CustomerEmail CE
+                JOIN MemberInfo MI ON CE.Email = MI.Email
+                WHERE CE.RewardPoints > 0;
+            """)
+            results = cursor.fetchall()
+            if results:
+                for row in results:
+                    print(f"Name: {row[0]}, Email: {row[1]}, Reward Points: {row[2]}")
+            else:
+                print("No customers with reward points.")
 
-        results = cursor.fetchall()
-        if not results:
-            print("No report data found.")
-            return
+        elif choice == "2":
+            confirm = input("Reset all reward points to 0? (yes/no): ").strip().lower()
+            if confirm == "yes":
+                cursor.execute("UPDATE CustomerEmail SET RewardPoints = 0 WHERE RewardPoints > 0;")
+                print("Customer reward points reset.")
+            else:
+                print("Cancelled.")
 
-        for row in results:
-            print(f"StoreID: {row[0]}, InStock: {row[1]}, ProductID: {row[2]}, Date: {row[3]}, "
-                  f"TxnCustomerID: {row[4]}, Price: ${row[5]:.2f}, StoreAddr: {row[6]}, "
-                  f"Product: {row[7]}, CustomerID: {row[8]}, Name: {row[9]}")
+        elif choice == "3":
+            cursor.execute("""
+                SELECT SE.StaffName, SE.Email, SE.NumberOfSignUps,
+                       (SE.NumberOfSignUps * 5) AS RewardAmount
+                FROM StaffEmails SE
+                WHERE SE.NumberOfSignUps > 0;
+            """)
+            results = cursor.fetchall()
+            if results:
+                for row in results:
+                    print(f"Staff: {row[0]}, Email: {row[1]}, Sign-ups: {row[2]}, Reward: ${row[3]:.2f}")
+            else:
+                print("No staff with signups recorded.")
+
+        elif choice == "4":
+            confirm = input("Reset all staff signups to 0? (yes/no): ").strip().lower()
+            if confirm == "yes":
+                cursor.execute("UPDATE StaffEmails SET NumberOfSignUps = 0;")
+                print("Staff signup counts reset.")
+            else:
+                print("Cancelled.")
+
+        elif choice == "5":
+            cursor.execute("""
+                SELECT I.TransactionID, I.ProductID, MI.SellPrice
+                FROM Involves I
+                JOIN MerchandiseInfo MI ON I.ProductID = MI.ProductID;
+            """)
+            results = cursor.fetchall()
+            if results:
+                for row in results:
+                    print(f"TransactionID: {row[0]}, ProductID: {row[1]}, Sell Price: ${row[2]:.2f}")
+            else:
+                print("No transaction data found.")
+
+        elif choice == "6":
+            cursor.execute("""
+                SELECT I.TransactionID, I.ProductID, MI.SellPrice AS FinalPrice
+                FROM Involves I
+                JOIN MerchandiseInfo MI ON I.ProductID = MI.ProductID
+                WHERE I.ProductID NOT IN (SELECT ProductID FROM DiscountInfo)
+                UNION ALL
+                SELECT I.TransactionID, I.ProductID, MI.SellPrice * 0.9 AS FinalPrice
+                FROM Involves I
+                JOIN MerchandiseInfo MI ON I.ProductID = MI.ProductID
+                JOIN DiscountInfo D ON I.ProductID = D.ProductID;
+            """)
+            results = cursor.fetchall()
+            if results:
+                for row in results:
+                    print(f"TransactionID: {row[0]}, ProductID: {row[1]}, Final Price: ${row[2]:.2f}")
+            else:
+                print("No final pricing data found.")
+
+        else:
+            print("Invalid option.")
+
     except mysql.connector.Error as e:
-        print("Error generating report:", e)
+        print("Database error:", e)
+
+
+
+
+# ------ Reports Info ------
+def generate_report(cursor):
+    '''
+    Generates business reports on sales performance and inventory levels.
+    
+    Options:
+    1. Daily total sales
+    2. Monthly total sales
+    3. Yearly total sales
+    4. Store stock report
+    5. Stock by Product ID
+    6. Customer spend in date range
+    
+    Returns:
+        None
+    '''
+
+    print("\n--- Reports ---")
+    print("1. Daily Sales")
+    print("2. Monthly Sales")
+    print("3. Yearly Sales")
+    print("4. Store Inventory Report")
+    print("5. Stock by Product ID")
+    print("6. Customer Spend in Date Range")
+    
+    choice = input("Choose a report to view (1–6): ").strip()
+
+    try:
+        if choice == "1":
+            cursor.execute("""
+                SELECT PurchaseDate, SUM(TotalPrice) AS TotalSales
+                FROM TransactionInfo
+                GROUP BY PurchaseDate
+                ORDER BY PurchaseDate;
+            """)
+            for row in cursor.fetchall():
+                print(f"Date: {row[0]}, Sales: ${row[1]:.2f}")
+
+        elif choice == "2":
+            cursor.execute("""
+                SELECT YEAR(PurchaseDate) AS Year, MONTH(PurchaseDate) AS Month, SUM(TotalPrice) AS TotalSales
+                FROM TransactionInfo
+                GROUP BY YEAR(PurchaseDate), MONTH(PurchaseDate)
+                ORDER BY Year, Month;
+            """)
+            for row in cursor.fetchall():
+                print(f"{row[0]}-{row[1]:02}: ${row[2]:.2f}")
+
+        elif choice == "3":
+            cursor.execute("""
+                SELECT YEAR(PurchaseDate) AS Year, SUM(TotalPrice) AS TotalSales
+                FROM TransactionInfo
+                GROUP BY YEAR(PurchaseDate)
+                ORDER BY Year;
+            """)
+            for row in cursor.fetchall():
+                print(f"{row[0]}: ${row[1]:.2f}")
+
+        elif choice == "4":
+            cursor.execute("""
+                SELECT S.StoreID, S.StoreAddr, PQ.ProductID, MI.ProductName, PQ.InstockQuantity
+                FROM Store S
+                INNER JOIN ProductQuantity PQ ON S.StoreID = PQ.StoreID
+                INNER JOIN MerchandiseInfo MI ON PQ.ProductID = MI.ProductID
+                ORDER BY S.StoreID, MI.ProductName;
+            """)
+            for row in cursor.fetchall():
+                print(f"StoreID: {row[0]}, Addr: {row[1]}, ProductID: {row[2]}, Name: {row[3]}, InStock: {row[4]}")
+
+        elif choice == "5":
+            product_id = input("Enter Product ID to check: ").strip()
+            cursor.execute("""
+                SELECT PQ.ProductID, MI.ProductName, S.StoreID, S.StoreAddr, PQ.InstockQuantity
+                FROM ProductQuantity PQ
+                INNER JOIN MerchandiseInfo MI ON PQ.ProductID = MI.ProductID
+                INNER JOIN Store S ON PQ.StoreID = S.StoreID
+                WHERE MI.ProductID = %s;
+            """, (product_id,))
+            for row in cursor.fetchall():
+                print(f"ProductID: {row[0]}, Name: {row[1]}, StoreID: {row[2]}, Addr: {row[3]}, InStock: {row[4]}")
+
+        elif choice == "6":
+            start = input("Start date (YYYY-MM-DD): ").strip()
+            end = input("End date (YYYY-MM-DD): ").strip()
+            cursor.execute("""
+                SELECT C.CustomerID, CE.CustomerName, SUM(T.TotalPrice) AS TotalSpent
+                FROM CustomerIDs C
+                INNER JOIN TransactionInfo T ON C.CustomerID = T.CustomerIDHasATransaction
+                INNER JOIN MemberInfo M ON C.CustomerID = M.CustomerID
+                INNER JOIN CustomerEmail CE ON M.Email = CE.Email
+                WHERE T.PurchaseDate BETWEEN %s AND %s
+                GROUP BY C.CustomerID, CE.CustomerName
+                ORDER BY TotalSpent DESC;
+            """, (start, end))
+            for row in cursor.fetchall():
+                print(f"CustomerID: {row[0]}, Name: {row[1]}, Total Spent: ${row[2]:.2f}")
+
+        else:
+            print("Invalid choice.")
+
+    except mysql.connector.Error as e:
+        print("Database error:", e)
