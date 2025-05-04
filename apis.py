@@ -32,11 +32,26 @@ def enter_store(cursor):
     phone = input("Enter store phone #: ").strip()
 
     try:
-        cursor.execute("INSERT INTO StoreAddress (StoreAddr, Phone) VALUES (%s, %s)", (store_addr, phone))
-        cursor.execute("INSERT INTO Store (StoreAddr) VALUES (%s)", (store_addr,))
+        # (i) START TRANSACTION — begins the atomic block of operations
+        cursor.execute("START TRANSACTION")
+
+        # Insert into StoreAddress (can fail due to unique constraint or bad input)
+        cursor.execute(
+            "INSERT INTO StoreAddress (StoreAddr, Phone) VALUES (%s, %s)",
+            (store_addr, phone)
+        )
+
+        # Insert into Store (references the above StoreAddr)
+        cursor.execute(
+            "INSERT INTO Store (StoreAddr) VALUES (%s)",
+            (store_addr,)
+        )
+
+        # (iii) COMMIT — both operations succeeded, so we save the changes permanently
+        cursor.execute("COMMIT")
         print("Store added successfully.")
 
-        # Show newly inserted store
+        # Show the inserted record
         cursor.execute("""
             SELECT Store.StoreID, Store.StoreAddr, StoreAddress.Phone
             FROM Store
@@ -48,7 +63,11 @@ def enter_store(cursor):
         print("New Store Record:", result)
 
     except mysql.connector.Error as e:
-        print(f"Error: {e}")
+        # (ii) ROLLBACK — if any error occurred, undo all changes from this transaction
+        cursor.execute("ROLLBACK")
+        print("Error occurred, transaction rolled back.")
+        print(f"MySQL Error: {e}")
+
 
 
 
@@ -533,109 +552,90 @@ def update_inventory(cursor):
                        (product_id, store_id, quantity))
         print("New inventory record added.")
 
+
 # ------ Maintaining Transactions ------
-def maintain_transactions(cursor):
-    '''
-    Maintains billing and transaction records including:
-    - Customer rewards
-    - Staff sign-up bonuses
-    - Product transaction prices (with/without discounts)
-    
-    Returns:
-        None
-    '''
-    print("\n--- Billing and Transaction Records ---")
-    print("1. View customer reward points")
-    print("2. Reset customer reward points")
-    print("3. View staff signup rewards")
-    print("4. Reset staff signups")
-    print("5. View product transaction prices")
-    print("6. View final prices with discounts")
+def view_customer_rewards(cursor):
+    cursor.execute("""
+        SELECT CE.CustomerName, CE.Email, CE.RewardPoints
+        FROM CustomerEmail CE
+        JOIN MemberInfo MI ON CE.Email = MI.Email
+        WHERE CE.RewardPoints > 0;
+    """)
+    results = cursor.fetchall()
+    if results:
+        for row in results:
+            print(f"Name: {row[0]}, Email: {row[1]}, Reward Points: {row[2]}")
+    else:
+        print("No customers with reward points.")
 
-    choice = input("Choose an option (1–6): ").strip()
 
-    try:
-        if choice == "1":
-            cursor.execute("""
-                SELECT CE.CustomerName, CE.Email, CE.RewardPoints
-                FROM CustomerEmail CE
-                JOIN MemberInfo MI ON CE.Email = MI.Email
-                WHERE CE.RewardPoints > 0;
-            """)
-            results = cursor.fetchall()
-            if results:
-                for row in results:
-                    print(f"Name: {row[0]}, Email: {row[1]}, Reward Points: {row[2]}")
-            else:
-                print("No customers with reward points.")
+def reset_customer_rewards(cursor):
+    confirm = input("Reset all reward points to 0? (yes/no): ").strip().lower()
+    if confirm == "yes":
+        cursor.execute("UPDATE CustomerEmail SET RewardPoints = 0 WHERE RewardPoints > 0;")
+        print("Customer reward points reset.")
+    else:
+        print("Cancelled.")
 
-        elif choice == "2":
-            confirm = input("Reset all reward points to 0? (yes/no): ").strip().lower()
-            if confirm == "yes":
-                cursor.execute("UPDATE CustomerEmail SET RewardPoints = 0 WHERE RewardPoints > 0;")
-                print("Customer reward points reset.")
-            else:
-                print("Cancelled.")
 
-        elif choice == "3":
-            cursor.execute("""
-                SELECT SE.StaffName, SE.Email, SE.NumberOfSignUps,
-                       (SE.NumberOfSignUps * 5) AS RewardAmount
-                FROM StaffEmails SE
-                WHERE SE.NumberOfSignUps > 0;
-            """)
-            results = cursor.fetchall()
-            if results:
-                for row in results:
-                    print(f"Staff: {row[0]}, Email: {row[1]}, Sign-ups: {row[2]}, Reward: ${row[3]:.2f}")
-            else:
-                print("No staff with signups recorded.")
+def view_staff_signups(cursor):
+    cursor.execute("""
+        SELECT SE.StaffName, SE.Email, SE.NumberOfSignUps,
+               (SE.NumberOfSignUps * 5) AS RewardAmount
+        FROM StaffEmails SE
+        WHERE SE.NumberOfSignUps > 0;
+    """)
+    results = cursor.fetchall()
+    if results:
+        for row in results:
+            print(f"Staff: {row[0]}, Email: {row[1]}, Sign-ups: {row[2]}, Reward: ${row[3]:.2f}")
+    else:
+        print("No staff with signups recorded.")
 
-        elif choice == "4":
-            confirm = input("Reset all staff signups to 0? (yes/no): ").strip().lower()
-            if confirm == "yes":
-                cursor.execute("UPDATE StaffEmails SET NumberOfSignUps = 0;")
-                print("Staff signup counts reset.")
-            else:
-                print("Cancelled.")
 
-        elif choice == "5":
-            cursor.execute("""
-                SELECT I.TransactionID, I.ProductID, MI.SellPrice
-                FROM Involves I
-                JOIN MerchandiseInfo MI ON I.ProductID = MI.ProductID;
-            """)
-            results = cursor.fetchall()
-            if results:
-                for row in results:
-                    print(f"TransactionID: {row[0]}, ProductID: {row[1]}, Sell Price: ${row[2]:.2f}")
-            else:
-                print("No transaction data found.")
+def reset_staff_signups(cursor):
+    confirm = input("Reset all staff signups to 0? (yes/no): ").strip().lower()
+    if confirm == "yes":
+        cursor.execute("UPDATE StaffEmails SET NumberOfSignUps = 0;")
+        print("Staff signup counts reset.")
+    else:
+        print("Cancelled.")
 
-        elif choice == "6":
-            cursor.execute("""
-                SELECT I.TransactionID, I.ProductID, MI.SellPrice AS FinalPrice
-                FROM Involves I
-                JOIN MerchandiseInfo MI ON I.ProductID = MI.ProductID
-                WHERE I.ProductID NOT IN (SELECT ProductID FROM DiscountInfo)
-                UNION ALL
-                SELECT I.TransactionID, I.ProductID, MI.SellPrice * 0.9 AS FinalPrice
-                FROM Involves I
-                JOIN MerchandiseInfo MI ON I.ProductID = MI.ProductID
-                JOIN DiscountInfo D ON I.ProductID = D.ProductID;
-            """)
-            results = cursor.fetchall()
-            if results:
-                for row in results:
-                    print(f"TransactionID: {row[0]}, ProductID: {row[1]}, Final Price: ${row[2]:.2f}")
-            else:
-                print("No final pricing data found.")
 
-        else:
-            print("Invalid option.")
+def view_product_prices(cursor):
+    cursor.execute("""
+        SELECT I.TransactionID, I.ProductID, MI.SellPrice
+        FROM Involves I
+        JOIN MerchandiseInfo MI ON I.ProductID = MI.ProductID;
+    """)
 
-    except mysql.connector.Error as e:
-        print("Database error:", e)
+    results = cursor.fetchall()
+    if results:
+        for row in results:
+            print(f"TransactionID: {row[0]}, ProductID: {row[1]}, Sell Price: ${row[2]:.2f}")
+    else:
+        print("No transaction data found.")
+
+
+def view_final_prices(cursor):
+    cursor.execute("""
+        SELECT I.TransactionID, I.ProductID, MI.SellPrice AS FinalPrice
+        FROM Involves I
+        JOIN MerchandiseInfo MI ON I.ProductID = MI.ProductID
+        WHERE I.ProductID NOT IN (SELECT ProductID FROM DiscountInfo)
+        UNION ALL
+        SELECT I.TransactionID, I.ProductID, MI.SellPrice * 0.9 AS FinalPrice
+        FROM Involves I
+        JOIN MerchandiseInfo MI ON I.ProductID = MI.ProductID
+        JOIN DiscountInfo D ON I.ProductID = D.ProductID;
+    """)
+    results = cursor.fetchall()
+    if results:
+        for row in results:
+            print(f"TransactionID: {row[0]}, ProductID: {row[1]}, Final Price: ${row[2]:.2f}")
+    else:
+        print("No final pricing data found.")
+
 
 
 

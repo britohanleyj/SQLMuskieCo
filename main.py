@@ -17,7 +17,9 @@ from apis import (
     enter_member, search_member, update_member, delete_member,
     enter_staff, search_staff, update_staff, delete_staff,
     enter_discount, search_discount, update_discount, delete_discount,
-    update_inventory, generate_report, maintain_transactions
+    update_inventory, generate_report, view_customer_rewards,
+    reset_customer_rewards, view_staff_signups, reset_staff_signups,
+    view_product_prices, view_final_prices
 )
 
 def generate_rewards_notice(cursor):
@@ -138,11 +140,15 @@ def command_line_ui(cursor):
             if operation == "1":
                 generate_rewards_notice(cursor)
             elif operation == "2":
-                print("Feature not implemented yet.")
+                view_staff_signups(cursor)
             elif operation == "3":
-                print("Feature not implemented yet.")
+                view_product_prices(cursor)
             elif operation == "4":
-                maintain_transactions(cursor)
+                reset_customer_rewards(cursor)
+            elif operation == "5":
+                reset_staff_signups(cursor)
+            elif operation == "6":
+                view_final_prices(cursor)
             else:
                 print("Invalid choice.")
 
