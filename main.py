@@ -135,6 +135,9 @@ def command_line_ui(cursor):
             print("1. Generate reward notices for members")
             print("2. Generate rewards checks for employees")
             print("3. Calculate the total price of a transaction")
+            print("4. Reset customer rewards")
+            print("5. Reset signups staff obtained.")
+            print("6. Generate final prices.")
             operation = input("Enter the number corresponding to your choice: ").strip()
 
             if operation == "1":
