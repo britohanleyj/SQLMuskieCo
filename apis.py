@@ -32,22 +32,22 @@ def enter_store(cursor):
     phone = input("Enter store phone #: ").strip()
 
     try:
-        # (i) START TRANSACTION — begins the atomic block of operations
+        # START TRANSACTION — begins the block of ops
         cursor.execute("START TRANSACTION")
 
-        # Insert into StoreAddress (can fail due to unique constraint or bad input)
+        # Insert into StoreAddress
         cursor.execute(
             "INSERT INTO StoreAddress (StoreAddr, Phone) VALUES (%s, %s)",
             (store_addr, phone)
         )
 
-        # Insert into Store (references the above StoreAddr)
+        # Insert into Store
         cursor.execute(
             "INSERT INTO Store (StoreAddr) VALUES (%s)",
             (store_addr,)
         )
 
-        # (iii) COMMIT — both operations succeeded, so we save the changes permanently
+        # COMMIT — both operations succeeded, so we save the changes permanently
         cursor.execute("COMMIT")
         print("Store added successfully.")
 
@@ -63,7 +63,7 @@ def enter_store(cursor):
         print("New Store Record:", result)
 
     except mysql.connector.Error as e:
-        # (ii) ROLLBACK — if any error occurred, undo all changes from this transaction
+        # ROLLBACK — if any error occurred, undo all changes from this transaction
         cursor.execute("ROLLBACK")
         print("Error occurred, transaction rolled back.")
         print(f"MySQL Error: {e}")
@@ -161,7 +161,7 @@ def update_store(cursor):
             print("No changes made.")
             return
 
-        # ✅ Show the updated row
+        # show the updated row
         cursor.execute("""
             SELECT Store.StoreID, Store.StoreAddr, StoreAddress.Phone
             FROM Store

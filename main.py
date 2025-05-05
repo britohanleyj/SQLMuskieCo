@@ -22,35 +22,6 @@ from apis import (
     view_product_prices, view_final_prices
 )
 
-def generate_rewards_notice(cursor):
-    '''
-    This function generates a reward notice for a specific member based on month and year
-    
-    Parameters:
-        cursor - A cursor object that is used to execute MySQL queries
-        
-    Returns:
-        None
-    '''
-    
-    print("\nGenerating a rewards notice for a member...")
-    member_id = int(input("Member ID number: "))
-    month = int(input("Month: "))
-    year = int(input("Year: "))
-
-    cursor.execute("""
-        SELECT members.name, rewards.amount
-        FROM rewards
-        JOIN members ON rewards.member_id = members.id
-        WHERE rewards.member_id = %s AND rewards.month = %s AND rewards.year = %s;
-    """, (member_id, month, year))
-
-    result = cursor.fetchone()
-    if result:
-        name, amount = result
-        print(f"\nRewards notice for member {name} during {month:02}/{year}: ${amount:.2f}")
-    else:
-        print("\nNo rewards found for that member and date.")
 
 
 def command_line_ui(cursor):
@@ -141,7 +112,7 @@ def command_line_ui(cursor):
             operation = input("Enter the number corresponding to your choice: ").strip()
 
             if operation == "1":
-                generate_rewards_notice(cursor)
+                view_customer_rewards(cursor)
             elif operation == "2":
                 view_staff_signups(cursor)
             elif operation == "3":
